@@ -280,7 +280,7 @@ closeBtn.MouseButton1Click:Connect(function()
     gui:Destroy()
 end)
 
--- Submit → set script_key → load Luarmor script
+-- Submit → set script_key → ẩn GUI → load Luarmor script
 submitBtn.MouseButton1Click:Connect(function()
     local key = keyInput.Text:gsub("%s+", "")
     if key == "" then
@@ -289,14 +289,25 @@ submitBtn.MouseButton1Click:Connect(function()
         return
     end
 
+    -- Disable nút + hiện loading
     submitBtn.Text = isVN and "Dang xac nhan..." or "Verifying..."
     submitBtn.BackgroundColor3 = Color3.fromRGB(100, 116, 139)
-    status.Text = ""
+    submitBtn.AutoButtonColor = false
+    status.TextColor3 = Color3.fromRGB(250, 204, 21)
+    status.Text = isVN and "Dang kiem tra key, vui long cho..." or "Checking key, please wait..."
 
     -- Set script_key cho Luarmor
     getgenv().script_key = key
 
-    task.wait(0.3)
+    task.wait(0.2)
+
+    -- Ẩn GUI ngay trước khi load (để user thấy script chạy)
+    local function hideGui()
+        TweenService:Create(overlay, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(mainFrame, TweenInfo.new(0.25), {Position = UDim2.new(0.5, -190, 0, -500)}):Play()
+        task.wait(0.3)
+        gui:Destroy()
+    end
 
     -- Load Luarmor script (Luarmor sẽ verify key server-side)
     local success, err = pcall(function()
@@ -304,30 +315,23 @@ submitBtn.MouseButton1Click:Connect(function()
     end)
 
     if success then
-        -- Key đúng → Luarmor cho phép chạy → đóng GUI
-        status.TextColor3 = Color3.fromRGB(16, 185, 129)
-        status.Text = isVN and "Key hop le! Dang tai script..." or "Key valid! Loading script..."
-        task.wait(0.8)
-        TweenService:Create(overlay, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-        TweenService:Create(mainFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-        for _, child in pairs(mainFrame:GetDescendants()) do
-            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
-                TweenService:Create(child, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
-            end
-        end
-        task.wait(0.4)
-        gui:Destroy()
+        -- Key đúng → Luarmor load xong → ẩn GUI
+        hideGui()
     else
-        -- Key sai hoặc lỗi
+        -- Key sai hoặc lỗi → hiện lại GUI
+        local errMsg = tostring(err)
         status.TextColor3 = Color3.fromRGB(239, 68, 68)
-        if tostring(err):find("key") or tostring(err):find("Key") then
-            status.Text = isVN and "Key khong hop le!" or "Invalid key!"
+        if errMsg:find("key") or errMsg:find("Key") or errMsg:find("whitelist") then
+            status.Text = isVN and "Key khong hop le hoac het han!" or "Invalid or expired key!"
+        elseif errMsg:find("Executor") or errMsg:find("support") then
+            status.Text = isVN and "Executor khong ho tro! Thu dung executor khac" or "Executor not supported!"
         else
-            status.Text = "Error: " .. tostring(err):sub(1, 40)
+            status.Text = "Error: " .. errMsg:sub(1, 50)
         end
         submitBtn.Text = isVN and "Xac Nhan Key" or "Submit Key"
         submitBtn.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
-        -- Shake
+        submitBtn.AutoButtonColor = true
+        -- Shake effect
         local orig = mainFrame.Position
         for i = 1, 3 do
             mainFrame.Position = orig + UDim2.new(0, 8, 0, 0)
